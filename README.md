@@ -7,8 +7,8 @@ A settlement schedule reflow system for financial operations. When disruptions o
 ```bash
 yarn install
 yarn build          # compile TypeScript
-yarn demo           # run all 5 scenarios
-yarn test           # run test suite (41 tests)
+yarn demo           # run all 8 scenarios with Gantt timeline
+yarn test           # run test suite (51 tests)
 yarn typecheck      # TypeScript type checking
 ```
 
