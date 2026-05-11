@@ -1,0 +1,17 @@
+{
+  "name": "settlement-schedule-reflow",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:nagnibedamihai/settlement-schedule-reflow.git",
+  "author": "Nagnibeda Mihai <nagnibeda.mihai@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "luxon": "^3.7.2"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.1",
+    "@types/node": "^25.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}
