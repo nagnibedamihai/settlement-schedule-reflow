@@ -32,6 +32,8 @@ export interface SettlementChannel extends Document<SettlementChannelData> {
 
 // ─── Settlement Task ──────────────────────────────────────────────────────────
 
+// @upgrade: consider making TaskType extensible (string union + branded type)
+// to support custom task types without modifying this file.
 export type TaskType =
   | 'marginCheck'
   | 'fundTransfer'

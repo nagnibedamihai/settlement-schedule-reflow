@@ -18,6 +18,9 @@ import type {
 
 const MAX_STABILIZATION_ITERATIONS = 100;
 
+// @upgrade: tasks are pinned to their assigned channel — add channel reassignment
+// optimization to move tasks to less-loaded channels when the original is congested.
+
 export class ReflowService {
   reflow(input: ReflowInput): ReflowResult {
     const taskMap = new Map<string, SettlementTask>();
@@ -69,6 +72,8 @@ export class ReflowService {
       const bookings = channelBookings.get(channel.docId)!;
 
       // Earliest start: max of (original start, all dependency end dates)
+      // @upgrade: implement critical path analysis to prioritize tasks with the
+      // least scheduling slack, minimizing overall settlement delay.
       let earliestStart = task.data.startDate;
       for (const depId of task.data.dependsOnTaskIds) {
         const dep = scheduledTasks.get(depId);
@@ -184,6 +189,9 @@ function insertBooking(bookings: ChannelBooking[], booking: ChannelBooking): voi
   }
 }
 
+// @upgrade: thread constraint information through the scheduling loop itself rather
+// than inferring reasons post-hoc from intermediate values. This would enable precise
+// attribution (e.g., "delayed 45 min by dependency X, then 30 min by blackout Y").
 function buildReason(
   task: SettlementTask,
   earliestStart: string,

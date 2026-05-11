@@ -71,6 +71,9 @@ export function getWindowEnd(
 /**
  * Advance dt forward to the next usable instant (within operating hours, outside blackouts).
  * Uses window-jumping instead of minute-by-minute iteration.
+ *
+ * @upgrade: make maxDays configurable per-channel or per-call-site. Include
+ * encountered blackout/window details in the error when the search exhausts.
  */
 export function advanceToNextValidTime(
   dt: DateTime,

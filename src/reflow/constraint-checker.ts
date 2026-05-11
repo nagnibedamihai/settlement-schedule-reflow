@@ -56,7 +56,7 @@ export function checkChannelOverlaps(tasks: SettlementTask[]): ConstraintViolati
           type: 'CHANNEL_OVERLAP',
           taskId: next.docId,
           taskReference: next.data.taskReference,
-          description: `${current.data.taskReference} [${current.data.startDate} – ${current.data.endDate}] overlaps with ${next.data.taskReference} [${next.data.startDate} – ${next.data.startDate}]`,
+          description: `${current.data.taskReference} [${current.data.startDate} – ${current.data.endDate}] overlaps with ${next.data.taskReference} [${next.data.startDate} – ${next.data.endDate}]`,
         });
       }
     }
@@ -91,6 +91,10 @@ export function checkDependencies(tasks: SettlementTask[]): ConstraintViolation[
 /**
  * Check that each task's start and end times fall within operating hours.
  * We sample at the boundaries of each operating window the task spans.
+ *
+ * @upgrade: validate the full span by walking each operating window the task
+ * crosses, not just start/end. Also verify duration consistency: that the
+ * elapsed wall-clock time equals duration + prep + paused hours.
  */
 export function checkOperatingHours(
   tasks: SettlementTask[],

@@ -111,6 +111,9 @@ export class TaskDAG {
     return sorted;
   }
 
+  // @upgrade: memoize transitive closures — currently O(V+E) per call, wasteful
+  // if getDependents/getAncestors are called repeatedly for cascade analysis.
+
   /** Transitive closure of forward adjacency — all downstream dependents. */
   getDependents(id: string): Set<string> {
     const result = new Set<string>();
