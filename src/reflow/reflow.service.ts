@@ -42,13 +42,24 @@ export class ReflowService {
     }
     const sortedIds = dag.topologicalSort();
 
-    // Phase 2: Schedule each task in dependency order
+    // Phase 2a: Pre-book all regulatory holds (immovable, must be visible to all tasks)
     const scheduledTasks = new Map<string, SettlementTask>();
     const changes: TaskChange[] = [];
 
+    for (const task of input.settlementTasks) {
+      if (!task.data.isRegulatoryHold) continue;
+      scheduledTasks.set(task.docId, task);
+      const bookings = channelBookings.get(task.data.settlementChannelId)!;
+      insertBooking(bookings, { taskId: task.docId, start: task.data.startDate, end: task.data.endDate });
+    }
+
+    // Phase 2b: Schedule each non-hold task in dependency order
     for (const taskId of sortedIds) {
       const task = taskMap.get(taskId);
       if (!task) throw new Error(`Task ${taskId} not found`);
+
+      // Already booked in phase 2a
+      if (task.data.isRegulatoryHold) continue;
 
       const channel = channelMap.get(task.data.settlementChannelId);
       if (!channel) throw new Error(`Channel ${task.data.settlementChannelId} not found for task ${task.data.taskReference}`);
@@ -56,13 +67,6 @@ export class ReflowService {
       const opHours = channel.data.operatingHours;
       const blackouts = channel.data.blackoutWindows;
       const bookings = channelBookings.get(channel.docId)!;
-
-      // Regulatory holds are immovable
-      if (task.data.isRegulatoryHold) {
-        scheduledTasks.set(taskId, task);
-        insertBooking(bookings, { taskId, start: task.data.startDate, end: task.data.endDate });
-        continue;
-      }
 
       // Earliest start: max of (original start, all dependency end dates)
       let earliestStart = task.data.startDate;
@@ -72,7 +76,7 @@ export class ReflowService {
         earliestStart = laterOf(earliestStart, dep.data.endDate);
       }
 
-      // Resolve channel conflicts then calculate end date, stabilize
+      // Initial conflict check (without end date — we don't know it yet)
       let candidateStart = resolveChannelConflict(earliestStart, bookings);
       let result = calculateEndDate(
         candidateStart,
@@ -82,9 +86,9 @@ export class ReflowService {
         task.data.prepTimeMinutes ?? 0,
       );
 
-      // Stabilization: wall-clock expansion may create new overlaps
+      // Stabilization: wall-clock expansion or span overlap may create new conflicts
       for (let i = 0; i < MAX_STABILIZATION_ITERATIONS; i++) {
-        const newCandidate = resolveChannelConflict(result.startDate, bookings);
+        const newCandidate = resolveChannelConflict(result.startDate, bookings, result.endDate);
         if (newCandidate === result.startDate) break;
         result = calculateEndDate(
           newCandidate,
@@ -146,18 +150,25 @@ export class ReflowService {
 /**
  * Walk through sorted channel bookings. If candidateStart overlaps a booking,
  * push it past that booking's end. Continue checking subsequent bookings.
+ * When candidateEnd is provided, also detects cases where the task's span
+ * would overlap a booking even though the start doesn't fall inside it.
  */
-function resolveChannelConflict(candidateStart: string, bookings: ChannelBooking[]): string {
+function resolveChannelConflict(candidateStart: string, bookings: ChannelBooking[], candidateEnd?: string): string {
   let current = candidateStart;
   for (const booking of bookings) {
     // Booking entirely before candidate — skip
     if (booking.end <= current) continue;
-    // Candidate falls within this booking — push past it
-    if (current < booking.end && current >= booking.start) {
+    // Candidate start falls within this booking — push past it
+    if (current >= booking.start && current < booking.end) {
       current = booking.end;
       continue;
     }
-    // Candidate is before this booking — no conflict from here on
+    // Candidate span overlaps this booking (start is before booking but end is after booking start)
+    if (candidateEnd && current < booking.start && candidateEnd > booking.start) {
+      current = booking.end;
+      continue;
+    }
+    // Candidate is before this booking and doesn't overlap — safe
     if (current < booking.start) break;
   }
   return current;

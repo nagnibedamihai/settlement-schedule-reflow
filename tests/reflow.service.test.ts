@@ -6,6 +6,9 @@ import { getBlackoutScenario } from '../src/data/scenario-blackout.js';
 import { getMultiConstraintScenario } from '../src/data/scenario-multi-constraint.js';
 import { getImpossibleScenario } from '../src/data/scenario-impossible.js';
 import { getPrepTimeScenario } from '../src/data/scenario-prep-time.js';
+import { getRegulatoryHoldScenario } from '../src/data/scenario-regulatory-hold.js';
+import { getWeekendSlaBreachScenario } from '../src/data/scenario-weekend-sla-breach.js';
+import { getBusyDayScenario } from '../src/data/scenario-busy-day.js';
 
 const service = new ReflowService();
 
@@ -141,6 +144,74 @@ describe('ReflowService', () => {
       input.tradeOrders[0]!.data.settlementDate = '2024-01-14T00:00:00.000Z';
       const result = service.reflow(input);
       expect(result.metrics.slaBreaches.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Scenario 6: Regulatory Hold + Channel Contention', () => {
+    const input = getRegulatoryHoldScenario();
+    const result = service.reflow(input);
+
+    it('regulatory hold stays pinned', () => {
+      const hold = result.updatedTasks.find((t) => t.docId === 'task-aml-hold')!;
+      expect(hold.data.startDate).toBe('2024-01-15T09:00:00.000Z');
+      expect(hold.data.endDate).toBe('2024-01-15T11:00:00.000Z');
+    });
+
+    it('fundTransfer is pushed past the hold', () => {
+      const fund = result.updatedTasks.find((t) => t.docId === 'task-t1-fund')!;
+      expect(fund.data.startDate >= '2024-01-15T11:00:00.000Z').toBe(true);
+    });
+
+    it('no channel overlaps', () => {
+      const violations = validateSchedule(result.updatedTasks, input.settlementChannels, input.settlementTasks);
+      const overlaps = violations.filter((v) => v.type === 'CHANNEL_OVERLAP');
+      expect(overlaps).toHaveLength(0);
+    });
+  });
+
+  describe('Scenario 7: Weekend Spill + SLA Breach', () => {
+    const input = getWeekendSlaBreachScenario();
+    const result = service.reflow(input);
+
+    it('tasks spill over the weekend to Monday', () => {
+      const recon = result.updatedTasks.find((t) => t.docId === 'task-fri-recon')!;
+      expect(recon.data.endDate >= '2024-01-15T00:00:00.000Z').toBe(true);
+    });
+
+    it('detects SLA breach on tight-deadline trade', () => {
+      expect(result.metrics.slaBreaches.length).toBeGreaterThan(0);
+      const breach = result.metrics.slaBreaches.find((b) => b.tradeOrderId === 'order-fri-2');
+      expect(breach).toBeDefined();
+    });
+
+    it('passes constraint validation', () => {
+      const violations = validateSchedule(result.updatedTasks, input.settlementChannels);
+      expect(violations).toHaveLength(0);
+    });
+  });
+
+  describe('Scenario 8: High-Volume Multi-Trade Day', () => {
+    const input = getBusyDayScenario();
+    const result = service.reflow(input);
+
+    it('schedules all 10 tasks', () => {
+      expect(result.updatedTasks).toHaveLength(10);
+    });
+
+    it('no channel overlaps across any channel', () => {
+      const violations = validateSchedule(result.updatedTasks, input.settlementChannels, input.settlementTasks);
+      const overlaps = violations.filter((v) => v.type === 'CHANNEL_OVERLAP');
+      expect(overlaps).toHaveLength(0);
+    });
+
+    it('all dependencies satisfied', () => {
+      const violations = validateSchedule(result.updatedTasks, input.settlementChannels);
+      const depViolations = violations.filter((v) => v.type === 'DEPENDENCY_VIOLATED');
+      expect(depViolations).toHaveLength(0);
+    });
+
+    it('utilization reported for all 3 channels', () => {
+      expect(result.metrics.channelUtilization.length).toBe(3);
     });
   });
 });

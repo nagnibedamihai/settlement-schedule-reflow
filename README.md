@@ -57,9 +57,12 @@ src/
 │   ├── scenario-blackout.ts
 │   ├── scenario-multi-constraint.ts
 │   ├── scenario-impossible.ts
-│   └── scenario-prep-time.ts
+│   ├── scenario-prep-time.ts
+│   ├── scenario-regulatory-hold.ts
+│   ├── scenario-weekend-sla-breach.ts
+│   └── scenario-busy-day.ts
 └── demo.ts                   # Runner script for all scenarios
-tests/                        # Vitest test suite (41 tests)
+tests/                        # Vitest test suite (51 tests)
 ```
 
 ### Data Flow
@@ -83,14 +86,17 @@ ReflowInput (tasks, channels, tradeOrders)
 | 3 | Multi-Constraint | 2 channels, cross-channel deps, channel conflict, blackout |
 | 4 | Impossible Schedule | Circular dependency → descriptive error message |
 | 5 | Prep Time | 30-min prep + 60-min processing spanning overnight |
+| 6 | Regulatory Hold + Contention | AML freeze (immovable) blocks channel, others route around it |
+| 7 | Weekend Spill + SLA Breach | Friday chain spills to Monday, tight-deadline trade triggers SLA breach |
+| 8 | High-Volume Multi-Trade Day | 3 trades, 10 tasks, 3 channels — production-scale realism |
 
 ## Bonus Features
 
 - **DAG implementation** with topological sort (Kahn's) and cycle detection (DFS three-color)
 - **Prep time handling** (`prepTimeMinutes` counted as working time within operating hours)
 - **Optimization metrics**: total delay, tasks affected, SLA breach detection, channel utilization %
-- **Automated test suite**: 41 tests across 4 files (Vitest)
-- **5 sample scenarios** (3 required + 2 bonus)
+- **Automated test suite**: 51 tests across 4 files (Vitest)
+- **8 sample scenarios** (3 required + 5 bonus) with ASCII Gantt timeline visualization
 - **AI prompts documentation** in `prompts/`
 
 ## Trade-offs & Known Limitations
